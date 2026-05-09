@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-inter);
+  --font-playfair: var(--font-playfair);
+}
+
+body {
+  background: #ffffff;
+  color: #171717;
+  font-family: var(--font-inter), Arial, sans-serif;
+}
+
+/* Shared input styles */
+.input {
+  @apply w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1a2a] bg-white;
+}
+
+.label {
+  @apply block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide;
+}
+
+.font-playfair {
+  font-family: var(--font-playfair), Georgia, serif;
+}
