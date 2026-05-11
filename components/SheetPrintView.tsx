@@ -110,15 +110,15 @@ function cardHtml(p: Product, s: Settings): string {
     <div style="width:${s.cardW}mm;height:${s.cardH}mm;box-sizing:border-box;overflow:hidden;${cutOutline}display:flex;flex-direction:column;">
       <div style="height:${s.topReservedMm}mm;flex-shrink:0"></div>
       <div style="flex:1;min-height:0;background:#fff;padding:2.5mm 2.5mm;box-sizing:border-box;display:flex;flex-direction:row;gap:1.5mm;overflow:hidden;">
-        <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-start;overflow:hidden;">
-          ${infoRows}
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;">
+          <div>${infoRows}</div>
+          ${photoCol}
         </div>
-        <div style="width:${rightColW}mm;flex-shrink:0;display:flex;flex-direction:column;justify-content:space-between;align-items:center;">
+        <div style="width:${rightColW}mm;flex-shrink:0;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;">
           <div style="width:100%">
             ${scanLabel}
             ${qrCol}
           </div>
-          ${photoCol}
         </div>
       </div>
       <div style="height:${s.bottomReservedMm}mm;flex-shrink:0"></div>
@@ -163,31 +163,31 @@ function CardCell({ p, s, isPreview = false, scale = 1 }: { p: Product; s: Setti
         padding: "2.5mm 2.5mm", boxSizing: "border-box",
         display: "flex", flexDirection: "row", gap: "1.5mm", overflow: "hidden",
       }}>
-        {/* Left: text info */}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "flex-start", overflow: "hidden" }}>
-          {infoRows.map(({ lbl, val, sz }, i) => (
-            <div key={i} style={{ marginBottom: i < infoRows.length - 1 ? "2mm" : 0 }}>
-              <div style={{ fontSize: "4pt", color: "#888", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.4pt", fontFamily: "Arial,sans-serif" }}>{lbl}</div>
-              <div style={{ fontSize: sz, fontWeight: "bold", color: "#111", lineHeight: 1.25, fontFamily: font }}>{val}</div>
+        {/* Left: text info top, photo bottom-left */}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", overflow: "hidden" }}>
+          <div>
+            {infoRows.map(({ lbl, val, sz }, i) => (
+              <div key={i} style={{ marginBottom: i < infoRows.length - 1 ? "2mm" : 0 }}>
+                <div style={{ fontSize: "4pt", color: "#888", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.4pt", fontFamily: "Arial,sans-serif" }}>{lbl}</div>
+                <div style={{ fontSize: sz, fontWeight: "bold", color: "#111", lineHeight: 1.25, fontFamily: font }}>{val}</div>
+              </div>
+            ))}
+          </div>
+          {s.showPhoto && (
+            <div style={{ width: `${photoSize}mm`, height: `${photoSize}mm`, border: "0.3mm solid #ddd", borderRadius: "1mm", overflow: "hidden", backgroundColor: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", padding: "1mm" }} />
             </div>
-          ))}
+          )}
         </div>
 
-        {/* Right: QR top, photo bottom */}
-        <div style={{ width: `${rightColW}mm`, flexShrink: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center" }}>
-          {/* QR */}
+        {/* Right: QR top-right only */}
+        <div style={{ width: `${rightColW}mm`, flexShrink: 0, display: "flex", flexDirection: "column", justifyContent: "flex-start", alignItems: "center" }}>
           {s.showQr && (
             <div style={{ width: "100%" }}>
               <div style={{ fontSize: "4.5pt", fontWeight: "bold", color: "#333", textAlign: "center", marginBottom: "0.5mm", fontFamily: "Arial,sans-serif" }}>Scan Here</div>
               <div style={{ width: `${qrSize}mm`, height: `${qrSize}mm`, margin: "0 auto", overflow: "hidden", flexShrink: 0 }}
                 dangerouslySetInnerHTML={{ __html: p.qrSvg.replace(/\s+width="[^"]*"/, "").replace(/\s+height="[^"]*"/, "") }} />
-            </div>
-          )}
-          {/* Photo */}
-          {s.showPhoto && (
-            <div style={{ width: `${photoSize}mm`, height: `${photoSize}mm`, margin: "0 auto", border: "0.3mm solid #ddd", borderRadius: "1mm", overflow: "hidden", backgroundColor: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", padding: "1mm" }} />
             </div>
           )}
         </div>
