@@ -89,8 +89,13 @@ function cardHtml(p: Product, s: Settings): string {
     s.showWeightKarat ? `<div><div style="font-size:4pt;color:#888;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Weight &amp; Karat</div><div style="font-size:7.5pt;font-weight:bold;color:#111;font-family:${font}">${formatWeight(p.weightMg)} &#8211; ${p.karat}</div></div>` : "",
   ].join("");
 
+  // Strip width/height attrs from the SVG so it fills our container
+  const qrSvgFixed = p.qrSvg
+    .replace(/\s+width="[^"]*"/, "")
+    .replace(/\s+height="[^"]*"/, "");
+
   const qrCol = s.showQr
-    ? `<div style="width:${qrSize}mm;height:${qrSize}mm;margin:0 auto">${p.qrSvg}</div>`
+    ? `<div style="width:${qrSize}mm;height:${qrSize}mm;margin:0 auto;overflow:hidden;flex-shrink:0">${qrSvgFixed}</div>`
     : "";
 
   const photoCol = s.showPhoto
@@ -174,7 +179,8 @@ function CardCell({ p, s, isPreview = false, scale = 1 }: { p: Product; s: Setti
           {s.showQr && (
             <div style={{ width: "100%" }}>
               <div style={{ fontSize: "4.5pt", fontWeight: "bold", color: "#333", textAlign: "center", marginBottom: "0.5mm", fontFamily: "Arial,sans-serif" }}>Scan Here</div>
-              <div style={{ width: `${qrSize}mm`, height: `${qrSize}mm`, margin: "0 auto" }} dangerouslySetInnerHTML={{ __html: p.qrSvg }} />
+              <div style={{ width: `${qrSize}mm`, height: `${qrSize}mm`, margin: "0 auto", overflow: "hidden", flexShrink: 0 }}
+                dangerouslySetInnerHTML={{ __html: p.qrSvg.replace(/\s+width="[^"]*"/, "").replace(/\s+height="[^"]*"/, "") }} />
             </div>
           )}
           {/* Photo */}
@@ -335,7 +341,7 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
         @page{size:${paper.w}mm ${paper.h}mm;margin:0}
         html,body{width:${paper.w}mm;margin:0;padding:0;background:#fff}
         img{display:block}
-        svg{display:block;width:100%;height:100%}
+        svg{display:block!important;width:100%!important;height:100%!important}
       </style>
     </head><body>${pagesHtml}</body></html>`;
 
