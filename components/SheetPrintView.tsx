@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
-import { useReactToPrint } from "react-to-print";
+import { useState, useMemo, useCallback } from "react";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -43,22 +42,25 @@ const DEFAULTS = {
   marginMm: 5,
   gapMm: 2,
   cardW: 54,
-  cardH: 85,          // full CR80-style card height (header+white+footer)
+  cardH: 85,
   copies: 1,
   showCutGuide: true,
-  fontStyle: "serif" as "serif" | "sans",
-  qrPosition: "bottom-right" as "bottom-right" | "bottom-left" | "top-right" | "top-left",
+  fontStyle: "sans" as "serif" | "sans",
   sortOrder: "selected" as "selected" | "name" | "articleNo" | "karat" | "weight",
   fillEmpty: "blank" as "blank" | "repeat",
-  // Pre-printed zone offsets (mm from card top/bottom to avoid)
-  topReservedMm: 14,   // pre-printed header height
-  bottomReservedMm: 8, // pre-printed footer height
-  // Content toggles
+  topReservedMm: 14,
+  bottomReservedMm: 8,
   showPhoto: true,
   showQr: true,
   showArticleNo: true,
   showName: true,
   showWeightKarat: true,
+  // Right column sizing (% of card width)
+  rightColPct: 42,
+  // QR size (% of right column width)
+  qrSizePct: 90,
+  // Photo size (% of right column width)
+  photoSizePct: 90,
 };
 
 type Settings = typeof DEFAULTS;
@@ -72,146 +74,129 @@ function getFont(style: "serif" | "sans") {
   return style === "serif" ? "Georgia,'Times New Roman',serif" : "Arial,Helvetica,sans-serif";
 }
 
-// ── Card cell — single source of truth for both preview and print ─────────────
-// isPreview=true renders coloured band guides; false renders transparent bands for print
+// ── Builds the inner HTML string for one card (used in print iframe) ──────────
+function cardHtml(p: Product, s: Settings): string {
+  const font = getFont(s.fontStyle);
+  const whiteH = s.cardH - s.topReservedMm - s.bottomReservedMm;
+  const rightColW = s.cardW * (s.rightColPct / 100);
+  const leftColW = s.cardW - rightColW - 3; // 3mm gap between cols
+  const qrSize = rightColW * (s.qrSizePct / 100);
+  const photoSize = rightColW * (s.photoSizePct / 100);
+
+  const infoRows = [
+    s.showArticleNo   ? `<div style="margin-bottom:2mm"><div style="font-size:4pt;color:#888;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Article No.</div><div style="font-size:8pt;font-weight:bold;color:#111;line-height:1.2;font-family:${font}">${p.articleNo}</div></div>` : "",
+    s.showName        ? `<div style="margin-bottom:2mm"><div style="font-size:4pt;color:#888;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Name</div><div style="font-size:7.5pt;font-weight:bold;color:#111;line-height:1.25;font-family:${font}">${p.name}</div></div>` : "",
+    s.showWeightKarat ? `<div><div style="font-size:4pt;color:#888;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Weight &amp; Karat</div><div style="font-size:7.5pt;font-weight:bold;color:#111;font-family:${font}">${formatWeight(p.weightMg)} &#8211; ${p.karat}</div></div>` : "",
+  ].join("");
+
+  const qrCol = s.showQr
+    ? `<div style="width:${qrSize}mm;height:${qrSize}mm;margin:0 auto">${p.qrSvg}</div>`
+    : "";
+
+  const photoCol = s.showPhoto
+    ? `<div style="width:${photoSize}mm;height:${photoSize}mm;margin:0 auto;border:0.3mm solid #ddd;border-radius:1mm;overflow:hidden;background:#fafafa;display:flex;align-items:center;justify-content:center"><img src="${p.photoUrl}" style="width:100%;height:100%;object-fit:contain;padding:1mm" /></div>`
+    : "";
+
+  const scanLabel = s.showQr ? `<div style="font-size:4.5pt;font-weight:bold;color:#333;text-align:center;margin-bottom:0.5mm;font-family:Arial,sans-serif">Scan Here</div>` : "";
+
+  const cutOutline = s.showCutGuide ? "outline:0.2mm dashed #aaa;" : "";
+
+  return `
+    <div style="width:${s.cardW}mm;height:${s.cardH}mm;box-sizing:border-box;overflow:hidden;${cutOutline}display:flex;flex-direction:column;">
+      <div style="height:${s.topReservedMm}mm;flex-shrink:0"></div>
+      <div style="flex:1;min-height:0;background:#fff;padding:2.5mm 2.5mm;box-sizing:border-box;display:flex;flex-direction:row;gap:1.5mm;overflow:hidden;">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-start;overflow:hidden;">
+          ${infoRows}
+        </div>
+        <div style="width:${rightColW}mm;flex-shrink:0;display:flex;flex-direction:column;justify-content:space-between;align-items:center;">
+          <div style="width:100%">
+            ${scanLabel}
+            ${qrCol}
+          </div>
+          ${photoCol}
+        </div>
+      </div>
+      <div style="height:${s.bottomReservedMm}mm;flex-shrink:0"></div>
+    </div>
+  `;
+}
+
+// ── React card for preview (same layout, React elements) ──────────────────────
 function CardCell({ p, s, isPreview = false, scale = 1 }: { p: Product; s: Settings; isPreview?: boolean; scale?: number }) {
   const font = getFont(s.fontStyle);
   const whiteH = s.cardH - s.topReservedMm - s.bottomReservedMm;
-
-  // img/QR size: fit within white zone height, cap at 40% of card width
-  const maxByHeight = (whiteH * 0.45);
-  const maxByWidth  = (s.cardW * 0.40);
-  const imgSize     = Math.min(maxByHeight, maxByWidth);
-
-  const photoEl = s.showPhoto ? (
-    <div style={{ width: `${imgSize}mm`, height: `${imgSize}mm`, border: "0.3mm solid #ddd", borderRadius: "1mm", overflow: "hidden", backgroundColor: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={p.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", padding: "0.8mm" }} />
-    </div>
-  ) : null;
-
-  const qrEl = s.showQr ? (
-    <div style={{ width: `${imgSize}mm`, height: `${imgSize}mm`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }} dangerouslySetInnerHTML={{ __html: p.qrSvg }} />
-  ) : null;
-
-  const isQrLeft = s.qrPosition === "bottom-left" || s.qrPosition === "top-left";
-  const isTop    = s.qrPosition === "top-right"   || s.qrPosition === "top-left";
-  const hasMedia = s.showPhoto || s.showQr;
-
-  const mediaRow = hasMedia ? (
-    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "2mm", flexShrink: 0 }}>
-      {isQrLeft ? (qrEl ?? photoEl) : (photoEl ?? qrEl)}
-      {isQrLeft ? (photoEl ?? qrEl) : (qrEl ?? photoEl)}
-    </div>
-  ) : null;
+  const rightColW = s.cardW * (s.rightColPct / 100);
+  const qrSize = rightColW * (s.qrSizePct / 100);
+  const photoSize = rightColW * (s.photoSizePct / 100);
 
   const infoRows = [
-    s.showArticleNo   && ["Article No.", p.articleNo,                              "8.5pt"],
-    s.showName        && ["Name",         p.name,                                   "7.5pt"],
-    s.showWeightKarat && ["Weight & Karat", `${formatWeight(p.weightMg)} – ${p.karat}`, "7.5pt"],
-  ].filter(Boolean) as [string, string, string][];
+    s.showArticleNo   && { lbl: "Article No.",     val: p.articleNo,                              sz: "8pt" },
+    s.showName        && { lbl: "Name",             val: p.name,                                   sz: "7.5pt" },
+    s.showWeightKarat && { lbl: "Weight & Karat",   val: `${formatWeight(p.weightMg)} – ${p.karat}`, sz: "7.5pt" },
+  ].filter(Boolean) as { lbl: string; val: string; sz: string }[];
 
   return (
     <div style={{
-      width: `${s.cardW}mm`,
-      height: `${s.cardH}mm`,
-      boxSizing: "border-box",
-      overflow: "hidden",
+      width: `${s.cardW}mm`, height: `${s.cardH}mm`,
+      boxSizing: "border-box", overflow: "hidden",
       outline: s.showCutGuide ? "0.2mm dashed #aaa" : "none",
-      display: "flex",
-      flexDirection: "column",
+      display: "flex", flexDirection: "column",
     }}>
       {/* Top reserved band */}
       <div style={{
-        height: `${s.topReservedMm}mm`,
-        flexShrink: 0,
+        height: `${s.topReservedMm}mm`, flexShrink: 0,
         background: isPreview ? "rgba(107,26,42,0.07)" : "transparent",
-        borderBottom: isPreview ? "0.3mm dashed rgba(107,26,42,0.3)" : "none",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        borderBottom: isPreview ? "0.3mm dashed rgba(107,26,42,0.35)" : "none",
+        display: "flex", alignItems: "center", justifyContent: "center",
       }}>
-        {isPreview && <span style={{ fontSize: `${6 / scale}pt`, color: "rgba(107,26,42,0.5)" }}>pre-printed header</span>}
+        {isPreview && <span style={{ fontSize: `${5.5 / scale}pt`, color: "rgba(107,26,42,0.45)" }}>pre-printed header</span>}
       </div>
 
-      {/* White print zone */}
+      {/* White zone: left info col + right QR/photo col */}
       <div style={{
-        flex: 1,
-        minHeight: 0,
-        backgroundColor: "#fff",
-        padding: "2.5mm 3mm",
-        boxSizing: "border-box",
-        fontFamily: font,
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        overflow: "hidden",
+        flex: 1, minHeight: 0, backgroundColor: "#fff",
+        padding: "2.5mm 2.5mm", boxSizing: "border-box",
+        display: "flex", flexDirection: "row", gap: "1.5mm", overflow: "hidden",
       }}>
-        {isTop && mediaRow}
-        <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-          {infoRows.map(([lbl, val, sz], i) => (
-            <div key={i} style={{ marginBottom: i < infoRows.length - 1 ? "1.5mm" : 0 }}>
-              <div style={{ fontSize: "4.5pt", color: "#666", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.4pt", fontFamily: "Arial,sans-serif" }}>{lbl}</div>
-              <div style={{ fontSize: sz, fontWeight: "bold", color: "#111", lineHeight: 1.2, fontFamily: font }}>{val}</div>
+        {/* Left: text info */}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "flex-start", overflow: "hidden" }}>
+          {infoRows.map(({ lbl, val, sz }, i) => (
+            <div key={i} style={{ marginBottom: i < infoRows.length - 1 ? "2mm" : 0 }}>
+              <div style={{ fontSize: "4pt", color: "#888", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.4pt", fontFamily: "Arial,sans-serif" }}>{lbl}</div>
+              <div style={{ fontSize: sz, fontWeight: "bold", color: "#111", lineHeight: 1.25, fontFamily: font }}>{val}</div>
             </div>
           ))}
         </div>
-        {!isTop && mediaRow}
+
+        {/* Right: QR top, photo bottom */}
+        <div style={{ width: `${rightColW}mm`, flexShrink: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center" }}>
+          {/* QR */}
+          {s.showQr && (
+            <div style={{ width: "100%" }}>
+              <div style={{ fontSize: "4.5pt", fontWeight: "bold", color: "#333", textAlign: "center", marginBottom: "0.5mm", fontFamily: "Arial,sans-serif" }}>Scan Here</div>
+              <div style={{ width: `${qrSize}mm`, height: `${qrSize}mm`, margin: "0 auto" }} dangerouslySetInnerHTML={{ __html: p.qrSvg }} />
+            </div>
+          )}
+          {/* Photo */}
+          {s.showPhoto && (
+            <div style={{ width: `${photoSize}mm`, height: `${photoSize}mm`, margin: "0 auto", border: "0.3mm solid #ddd", borderRadius: "1mm", overflow: "hidden", backgroundColor: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", padding: "1mm" }} />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Bottom reserved band */}
       <div style={{
-        height: `${s.bottomReservedMm}mm`,
-        flexShrink: 0,
+        height: `${s.bottomReservedMm}mm`, flexShrink: 0,
         background: isPreview ? "rgba(201,168,76,0.12)" : "transparent",
         borderTop: isPreview ? "0.3mm dashed rgba(201,168,76,0.5)" : "none",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        display: "flex", alignItems: "center", justifyContent: "center",
       }}>
-        {isPreview && <span style={{ fontSize: `${6 / scale}pt`, color: "rgba(150,110,20,0.6)" }}>pre-printed footer</span>}
+        {isPreview && <span style={{ fontSize: `${5.5 / scale}pt`, color: "rgba(150,110,20,0.6)" }}>pre-printed footer</span>}
       </div>
     </div>
-  );
-}
-
-// ── Print content ─────────────────────────────────────────────────────────────
-function PrintContent({
-  slots, pages, perSheet, cols, rows, s, paper,
-}: {
-  slots: (Product | null)[];
-  pages: number; perSheet: number; cols: number; rows: number;
-  s: Settings;
-  paper: { w: number; h: number };
-}) {
-  return (
-    <>
-      {Array.from({ length: pages }, (_, pageIdx) => {
-        const pageSlots = slots.slice(pageIdx * perSheet, (pageIdx + 1) * perSheet);
-        return (
-          <div key={pageIdx} style={{
-            position: "relative",
-            width: `${paper.w}mm`,
-            height: `${paper.h}mm`,
-            overflow: "hidden",
-            pageBreakAfter: pageIdx < pages - 1 ? "always" : "auto",
-            breakAfter: pageIdx < pages - 1 ? "page" : "auto",
-          }}>
-            {Array.from({ length: rows }, (_, row) =>
-              Array.from({ length: cols }, (_, col) => {
-                const product = pageSlots[row * cols + col] ?? null;
-                if (!product) return null;
-                return (
-                  <div key={`${row}-${col}`} style={{ position: "absolute", left: `${s.marginMm + col * (s.cardW + s.gapMm)}mm`, top: `${s.marginMm + row * (s.cardH + s.gapMm)}mm` }}>
-                    <CardCell p={product} s={s} />
-                  </div>
-                );
-              })
-            )}
-          </div>
-        );
-      })}
-    </>
   );
 }
 
@@ -268,9 +253,20 @@ function MmInput({ label, value, onChange, min = 0, max = 50 }: { label: string;
   );
 }
 
+function PctInput({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <div className="relative">
+        <Input type="number" min={20} max={80} value={value} onChange={(e) => onChange(Math.min(80, Math.max(20, Number(e.target.value))))} className="h-9 pr-6 text-sm" />
+        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">%</span>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SheetPrintView({ products }: { products: Product[] }) {
-  const printRef = useRef<HTMLDivElement>(null);
   const [s, setS] = useState<Settings>({ ...DEFAULTS });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [settingsOpen, setSettingsOpen] = useState(true);
@@ -296,9 +292,9 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
       if (s.sortOrder === "weight") return a.weightMg - b.weightMg;
       return 0;
     });
-    const withCopies: Product[] = [];
-    sorted.forEach((p) => { for (let i = 0; i < s.copies; i++) withCopies.push(p); });
-    return withCopies;
+    const out: Product[] = [];
+    sorted.forEach((p) => { for (let i = 0; i < s.copies; i++) out.push(p); });
+    return out;
   }, [products, selected, s.sortOrder, s.copies]);
 
   const slots = useMemo(() => {
@@ -312,14 +308,65 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
 
   const pages = Math.max(1, Math.ceil(slots.length / perSheet));
 
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: `SAM-Cards-${s.paperSize}-${s.orientation}`,
-    pageStyle: `
-      @page { size: ${paper.w}mm ${paper.h}mm; margin: 0; }
-      @media print { html, body { margin: 0; padding: 0; } }
-    `,
-  });
+  // ── Print via iframe ────────────────────────────────────────────────────────
+  const handlePrint = useCallback(() => {
+    if (!baseQueue.length) return;
+
+    // Build all pages as raw HTML
+    const pagesHtml = Array.from({ length: pages }, (_, pageIdx) => {
+      const pageSlots = slots.slice(pageIdx * perSheet, (pageIdx + 1) * perSheet);
+      const cards = Array.from({ length: rows }, (_, row) =>
+        Array.from({ length: cols }, (_, col) => {
+          const product = pageSlots[row * cols + col] ?? null;
+          const left = s.marginMm + col * (s.cardW + s.gapMm);
+          const top  = s.marginMm + row * (s.cardH + s.gapMm);
+          if (!product) return "";
+          return `<div style="position:absolute;left:${left}mm;top:${top}mm">${cardHtml(product, s)}</div>`;
+        }).join("")
+      ).join("");
+
+      const pageBreak = pageIdx < pages - 1 ? "page-break-after:always;break-after:page;" : "";
+      return `<div style="position:relative;width:${paper.w}mm;height:${paper.h}mm;overflow:hidden;${pageBreak}">${cards}</div>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        @page{size:${paper.w}mm ${paper.h}mm;margin:0}
+        html,body{width:${paper.w}mm;margin:0;padding:0;background:#fff}
+        img{display:block}
+        svg{display:block;width:100%;height:100%}
+      </style>
+    </head><body>${pagesHtml}</body></html>`;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none";
+    document.body.appendChild(iframe);
+
+    // Use onload to ensure the iframe has fully parsed the HTML before
+    // querying for images — doc.querySelectorAll right after doc.write()
+    // runs before the parser finishes and returns 0 elements, causing an
+    // immediate blank print.
+    iframe.onload = () => {
+      const doc = iframe.contentDocument!;
+      const imgs = Array.from(doc.querySelectorAll("img"));
+      const loadAll = imgs.map((img) => new Promise<void>((res) => {
+        if (img.complete) { res(); return; }
+        img.onload = () => res();
+        img.onerror = () => res();
+      }));
+      Promise.all(loadAll).then(() => {
+        iframe.contentWindow!.focus();
+        iframe.contentWindow!.print();
+        setTimeout(() => document.body.removeChild(iframe), 2000);
+      });
+    };
+
+    const doc = iframe.contentDocument!;
+    doc.open();
+    doc.write(html);
+    doc.close();
+  }, [baseQueue, slots, pages, perSheet, cols, rows, s, paper]);
 
   function toggleProduct(id: string) {
     setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -354,7 +401,7 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
               <RotateCcw className="w-3 h-3" /> Reset
             </button>
           )}
-          <button onClick={() => handlePrint()} disabled={baseQueue.length === 0}
+          <button onClick={handlePrint} disabled={baseQueue.length === 0}
             className="flex items-center gap-2 px-5 h-10 rounded-md bg-[#6b1a2a] text-white text-sm font-semibold hover:bg-[#5a1522] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             <Printer className="w-4 h-4" />
             Print{pages > 0 && baseQueue.length > 0 ? ` · ${pages} page${pages > 1 ? "s" : ""}` : ""}
@@ -409,10 +456,10 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <SectionLabel>Pre-printed Zones</SectionLabel>
-                    <span className="text-[10px] text-muted-foreground bg-amber-50 text-amber-700 border border-amber-200 rounded px-1.5 py-0.5">skip these bands</span>
+                    <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 rounded px-1.5 py-0.5">skip these bands</span>
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-snug">
-                    The card&apos;s header and footer are already printed. Set how many mm to skip at the top and bottom so your content lands only in the white zone.
+                    Header &amp; footer already printed — set mm to skip so content lands in the white zone only.
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     <MmInput label="Top (header)" value={s.topReservedMm} onChange={(v) => update("topReservedMm", v)} min={0} max={40} />
@@ -421,6 +468,21 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
                   <div className="rounded bg-muted/30 px-2.5 py-1.5 text-[11px] text-muted-foreground flex justify-between">
                     <span>White zone height</span>
                     <span className="font-semibold">{Math.max(0, s.cardH - s.topReservedMm - s.bottomReservedMm)} mm</span>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Layout sizing */}
+                <div className="space-y-2">
+                  <SectionLabel>Layout Sizing</SectionLabel>
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    Right column (QR + photo) width as % of card. QR &amp; photo size as % of that column.
+                  </p>
+                  <PctInput label="Right column width %" value={s.rightColPct} onChange={(v) => update("rightColPct", v)} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <PctInput label="QR size %" value={s.qrSizePct} onChange={(v) => update("qrSizePct", v)} />
+                    <PctInput label="Photo size %" value={s.photoSizePct} onChange={(v) => update("photoSizePct", v)} />
                   </div>
                 </div>
 
@@ -445,22 +507,6 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
                   <CheckRow label="Article number" checked={s.showArticleNo} onChange={(v) => update("showArticleNo", v)} />
                   <CheckRow label="Product name" checked={s.showName} onChange={(v) => update("showName", v)} />
                   <CheckRow label="Weight & karat" checked={s.showWeightKarat} onChange={(v) => update("showWeightKarat", v)} />
-                </div>
-
-                <Separator />
-
-                {/* QR / photo position */}
-                <div className="space-y-2">
-                  <SectionLabel>Photo & QR Position</SectionLabel>
-                  <Select value={s.qrPosition} onValueChange={(v) => v && update("qrPosition", v as Settings["qrPosition"])}>
-                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="bottom-right">Photo left · QR right (bottom)</SelectItem>
-                      <SelectItem value="bottom-left">QR left · Photo right (bottom)</SelectItem>
-                      <SelectItem value="top-right">Photo left · QR right (top)</SelectItem>
-                      <SelectItem value="top-left">QR left · Photo right (top)</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
 
                 <Separator />
@@ -619,9 +665,7 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
                       const y = (s.marginMm + row * (s.cardH + s.gapMm)) * scale;
                       const w = s.cardW * scale;
                       const h = s.cardH * scale;
-                      // CardCell renders in mm; scale it down to pixels for the preview
-                      const mmToPx = 3.7795;
-                      const cellScale = w / (s.cardW * mmToPx);
+                      const cellScale = w / (s.cardW * 3.7795);
 
                       return (
                         <div key={`${row}-${col}`} style={{ position: "absolute", left: x, top: y, width: w, height: h, overflow: "hidden", border: "0.5px solid #d1d5db" }}>
@@ -646,11 +690,6 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
             )}
           </div>
         </div>
-      </div>
-
-      {/* Print target — hidden off-screen so react-to-print can measure it */}
-      <div ref={printRef} style={{ position: "fixed", top: "-9999px", left: "-9999px", pointerEvents: "none" }}>
-        <PrintContent slots={slots} pages={pages} perSheet={perSheet} cols={cols} rows={rows} s={s} paper={paper} />
       </div>
     </div>
   );
