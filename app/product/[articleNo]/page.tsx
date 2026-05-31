@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import Image from "next/image";
 
 export async function generateMetadata({
   params,
@@ -12,8 +13,9 @@ export async function generateMetadata({
   return {
     title: product ? `${product.name} — Sri Alankar Mandir` : "Product Not Found",
     description: product
-      ? `${product.name} · ${product.weightMg}Mg · ${product.karat} Gold · Article ${product.articleNo}`
+      ? `${product.name} · ${product.weightMg}mg · ${product.karat} Gold · Article ${product.articleNo}`
       : undefined,
+    viewport: "width=device-width, initial-scale=1",
   };
 }
 
@@ -27,430 +29,147 @@ export default async function ProductPublicPage({
   if (!product) notFound();
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500&display=swap');
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-          background: #0d0608;
-          font-family: 'Inter', sans-serif;
-          min-height: 100vh;
-        }
-
-        .page {
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          background: radial-gradient(ellipse at 50% 0%, #2a0d14 0%, #0d0608 60%);
-          padding: 0 0 60px;
-        }
-
-        /* ── Top bar ── */
-        .topbar {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 20px 24px 0;
-          gap: 12px;
-        }
-        .topbar-line {
-          flex: 1;
-          height: 1px;
-          background: linear-gradient(to right, transparent, #c9a84c44);
-          max-width: 80px;
-        }
-        .topbar-line.right {
-          background: linear-gradient(to left, transparent, #c9a84c44);
-        }
-        .brand-pill {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          background: rgba(201,168,76,0.08);
-          border: 1px solid rgba(201,168,76,0.25);
-          border-radius: 50px;
-          padding: 8px 18px 8px 8px;
-        }
-        .brand-logo {
-          width: 36px;
-          height: 36px;
-          background: linear-gradient(135deg, #c9a84c, #f0d080, #a07830);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-family: 'Playfair Display', serif;
-          font-weight: 700;
-          font-size: 13px;
-          color: #3a0a14;
-          letter-spacing: -0.5px;
-        }
-        .brand-text { line-height: 1.2; }
-        .brand-name {
-          font-family: 'Playfair Display', serif;
-          font-size: 13px;
-          font-weight: 600;
-          color: #f5e6c8;
-          letter-spacing: 0.3px;
-        }
-        .brand-sub {
-          font-size: 9px;
-          color: #c9a84c;
-          letter-spacing: 2px;
-          text-transform: uppercase;
-        }
-
-        /* ── Hero image ── */
-        .hero {
-          width: 100%;
-          max-width: 420px;
-          margin: 28px auto 0;
-          padding: 0 20px;
-          position: relative;
-        }
-        .hero-glow {
-          position: absolute;
-          inset: 20px;
-          background: radial-gradient(circle, rgba(201,168,76,0.15) 0%, transparent 70%);
-          border-radius: 50%;
-          pointer-events: none;
-        }
-        .hero-frame {
-          width: 100%;
-          aspect-ratio: 1;
-          background: radial-gradient(ellipse at 50% 30%, #1e1218, #0d0608);
-          border: 1px solid rgba(201,168,76,0.2);
-          border-radius: 24px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 28px;
-          position: relative;
-          overflow: hidden;
-        }
-        .hero-frame::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 0; right: 0;
-          height: 1px;
-          background: linear-gradient(to right, transparent, #c9a84c88, transparent);
-        }
-        .hero-img {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-          filter: drop-shadow(0 8px 32px rgba(201,168,76,0.3));
-          transition: transform 0.4s ease;
-        }
-        .hero-img:hover { transform: scale(1.04); }
-
-        /* ── Corner decorations ── */
-        .corner {
-          position: absolute;
-          width: 18px;
-          height: 18px;
-          opacity: 0.5;
-        }
-        .corner-tl { top: 12px; left: 12px; border-top: 1.5px solid #c9a84c; border-left: 1.5px solid #c9a84c; border-radius: 3px 0 0 0; }
-        .corner-tr { top: 12px; right: 12px; border-top: 1.5px solid #c9a84c; border-right: 1.5px solid #c9a84c; border-radius: 0 3px 0 0; }
-        .corner-bl { bottom: 12px; left: 12px; border-bottom: 1.5px solid #c9a84c; border-left: 1.5px solid #c9a84c; border-radius: 0 0 0 3px; }
-        .corner-br { bottom: 12px; right: 12px; border-bottom: 1.5px solid #c9a84c; border-right: 1.5px solid #c9a84c; border-radius: 0 0 3px 0; }
-
-        /* ── Info card ── */
-        .card {
-          width: 100%;
-          max-width: 420px;
-          margin: 20px auto 0;
-          padding: 0 20px;
-        }
-        .card-inner {
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 20px;
-          overflow: hidden;
-          backdrop-filter: blur(12px);
-        }
-
-        /* Product name block */
-        .name-block {
-          padding: 24px 24px 20px;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-          text-align: center;
-        }
-        .product-name {
-          font-family: 'Playfair Display', serif;
-          font-size: 22px;
-          font-weight: 700;
-          color: #f5e6c8;
-          line-height: 1.3;
-          letter-spacing: 0.2px;
-        }
-        .article-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          margin-top: 8px;
-          background: rgba(201,168,76,0.1);
-          border: 1px solid rgba(201,168,76,0.2);
-          border-radius: 6px;
-          padding: 4px 10px;
-        }
-        .article-dot {
-          width: 5px; height: 5px;
-          background: #c9a84c;
-          border-radius: 50%;
-        }
-        .article-no {
-          font-family: 'Inter', monospace;
-          font-size: 11px;
-          font-weight: 500;
-          color: #c9a84c;
-          letter-spacing: 1.5px;
-          text-transform: uppercase;
-        }
-
-        /* Stats row */
-        .stats {
-          display: grid;
-          grid-template-columns: 1fr 1px 1fr;
-          padding: 20px 24px;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-        }
-        .stat-divider {
-          background: rgba(255,255,255,0.08);
-          align-self: stretch;
-        }
-        .stat {
-          text-align: center;
-          padding: 0 8px;
-        }
-        .stat-label {
-          font-size: 9px;
-          font-weight: 500;
-          color: rgba(255,255,255,0.35);
-          letter-spacing: 2px;
-          text-transform: uppercase;
-          margin-bottom: 6px;
-        }
-        .stat-value {
-          font-family: 'Playfair Display', serif;
-          font-size: 20px;
-          font-weight: 700;
-          color: #f5e6c8;
-          line-height: 1;
-        }
-        .stat-unit {
-          font-size: 11px;
-          color: #c9a84c;
-          font-weight: 400;
-          font-family: 'Inter', sans-serif;
-        }
-
-        /* Purity badge */
-        .purity-row {
-          padding: 16px 24px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-        }
-        .purity-badge {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          background: linear-gradient(135deg, rgba(201,168,76,0.12), rgba(201,168,76,0.06));
-          border: 1px solid rgba(201,168,76,0.3);
-          border-radius: 10px;
-          padding: 10px 20px;
-          width: 100%;
-          justify-content: center;
-        }
-        .purity-icon {
-          font-size: 18px;
-        }
-        .purity-text {
-          font-size: 12px;
-          color: rgba(255,255,255,0.5);
-          letter-spacing: 0.5px;
-        }
-        .purity-val {
-          font-family: 'Playfair Display', serif;
-          font-size: 16px;
-          font-weight: 700;
-          color: #c9a84c;
-        }
-
-        /* Footer contact */
-        .contact-row {
-          padding: 16px 24px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-        }
-        .contact-icon {
-          font-size: 14px;
-          opacity: 0.5;
-        }
-        .contact-text {
-          font-size: 11px;
-          color: rgba(255,255,255,0.3);
-          letter-spacing: 0.3px;
-        }
-
-        /* ── Quality seal ── */
-        .seal {
-          width: 100%;
-          max-width: 420px;
-          margin: 16px auto 0;
-          padding: 0 20px;
-        }
-        .seal-inner {
-          background: rgba(201,168,76,0.05);
-          border: 1px solid rgba(201,168,76,0.12);
-          border-radius: 14px;
-          padding: 14px 20px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .seal-icon {
-          width: 36px; height: 36px;
-          background: linear-gradient(135deg, rgba(201,168,76,0.2), rgba(201,168,76,0.05));
-          border: 1px solid rgba(201,168,76,0.2);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 16px;
-          flex-shrink: 0;
-        }
-        .seal-text { flex: 1; }
-        .seal-title {
-          font-size: 11px;
-          font-weight: 600;
-          color: #c9a84c;
-          letter-spacing: 0.5px;
-        }
-        .seal-desc {
-          font-size: 10px;
-          color: rgba(255,255,255,0.3);
-          margin-top: 2px;
-          line-height: 1.4;
-        }
-
-        /* ── Gold shimmer animation on name ── */
-        @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
-        }
-        .shimmer-text {
-          background: linear-gradient(90deg, #f5e6c8 30%, #c9a84c 50%, #f5e6c8 70%);
-          background-size: 200% auto;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-          animation: shimmer 4s linear infinite;
-        }
-      `}</style>
-
-      <div className="page">
-        {/* Top brand bar */}
-        <div className="topbar">
-          <div className="topbar-line"></div>
-          <div className="brand-pill">
-            <div className="brand-logo">SM</div>
-            <div className="brand-text">
-              <div className="brand-name">Sri Alankar Mandir</div>
-              <div className="brand-sub">Fine Jewellery · Est. 1963</div>
-            </div>
-          </div>
-          <div className="topbar-line right"></div>
-        </div>
-
-        {/* Hero image */}
-        <div className="hero">
-          <div className="hero-glow"></div>
-          <div className="hero-frame">
-            <div className="corner corner-tl"></div>
-            <div className="corner corner-tr"></div>
-            <div className="corner corner-bl"></div>
-            <div className="corner corner-br"></div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={product.photoUrl}
-              alt={product.name}
-              className="hero-img"
-            />
+    <div className="min-h-screen bg-[#0d0608] flex flex-col items-center pb-14"
+      style={{ background: "radial-gradient(ellipse at 50% 0%, #2a0d14 0%, #0d0608 60%)" }}
+    >
+      {/* Brand bar */}
+      <div className="w-full flex items-center justify-center gap-3 px-6 pt-5">
+        <div className="flex-1 max-w-[80px] h-px" style={{ background: "linear-gradient(to right, transparent, #c9a84c44)" }} />
+        <div className="flex items-center gap-2.5 rounded-full px-4 py-2 border"
+          style={{ background: "rgba(201,168,76,0.08)", borderColor: "rgba(201,168,76,0.25)" }}
+        >
+          <div className="w-9 h-9 rounded-full flex items-center justify-center text-[#3a0a14] font-bold text-sm font-playfair shrink-0"
+            style={{ background: "linear-gradient(135deg,#c9a84c,#f0d080,#a07830)" }}
+          >SM</div>
+          <div>
+            <div className="text-[13px] font-semibold text-[#f5e6c8] font-playfair">Sri Alankar Mandir</div>
+            <div className="text-[9px] text-[#c9a84c] tracking-[2px] uppercase">Fine Jewellery · Est. 1963</div>
           </div>
         </div>
+        <div className="flex-1 max-w-[80px] h-px" style={{ background: "linear-gradient(to left, transparent, #c9a84c44)" }} />
+      </div>
 
-        {/* Info card */}
-        <div className="card">
-          <div className="card-inner">
+      {/* Hero image */}
+      <div className="w-full max-w-sm mx-auto mt-7 px-5">
+        <div className="relative w-full aspect-square rounded-3xl overflow-hidden border flex items-center justify-center p-7"
+          style={{
+            background: "radial-gradient(ellipse at 50% 30%, #1e1218, #0d0608)",
+            borderColor: "rgba(201,168,76,0.2)",
+          }}
+        >
+          {/* top shine */}
+          <div className="absolute top-0 left-0 right-0 h-px"
+            style={{ background: "linear-gradient(to right, transparent, #c9a84c88, transparent)" }} />
+          {/* corner accents */}
+          {[["top-3 left-3 border-t border-l rounded-tl", "border-t-[#c9a84c] border-l-[#c9a84c]"],
+            ["top-3 right-3 border-t border-r rounded-tr", "border-t-[#c9a84c] border-r-[#c9a84c]"],
+            ["bottom-3 left-3 border-b border-l rounded-bl", "border-b-[#c9a84c] border-l-[#c9a84c]"],
+            ["bottom-3 right-3 border-b border-r rounded-br", "border-b-[#c9a84c] border-r-[#c9a84c]"],
+          ].map(([pos, border], i) => (
+            <div key={i} className={`absolute w-4 h-4 opacity-50 ${pos} ${border}`} />
+          ))}
+          {/* glow */}
+          <div className="absolute inset-5 rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, rgba(201,168,76,0.15) 0%, transparent 70%)" }} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={product.photoUrl}
+            alt={product.name}
+            className="w-full h-full object-contain relative z-10"
+            style={{ filter: "drop-shadow(0 8px 32px rgba(201,168,76,0.3))" }}
+            loading="eager"
+            fetchPriority="high"
+          />
+        </div>
+      </div>
 
-            {/* Name + article */}
-            <div className="name-block">
-              <div className="product-name shimmer-text">{product.name}</div>
-              <div className="article-badge">
-                <div className="article-dot"></div>
-                <span className="article-no">{product.articleNo}</span>
-              </div>
+      {/* Info card */}
+      <div className="w-full max-w-sm mx-auto mt-5 px-5">
+        <div className="rounded-2xl overflow-hidden"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+        >
+          {/* Name */}
+          <div className="px-6 py-5 border-b text-center" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+            <h1 className="font-playfair text-xl font-bold leading-snug"
+              style={{
+                background: "linear-gradient(90deg,#f5e6c8 30%,#c9a84c 50%,#f5e6c8 70%)",
+                backgroundSize: "200% auto",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                animation: "shimmer 4s linear infinite",
+              }}
+            >{product.name}</h1>
+            <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md"
+              style={{ background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.2)" }}
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-[#c9a84c]" />
+              <span className="font-mono text-[11px] font-medium text-[#c9a84c] tracking-[1.5px] uppercase">
+                {product.articleNo}
+              </span>
             </div>
+          </div>
 
-            {/* Weight + Karat stats */}
-            <div className="stats">
-              <div className="stat">
-                <div className="stat-label">Weight</div>
-                <div className="stat-value">
-                  {product.weightMg}
-                  <span className="stat-unit"> mg</span>
+          {/* Stats */}
+          <div className="grid grid-cols-2 divide-x divide-white/10" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            {[
+              { label: "Weight", value: product.weightMg, unit: "mg" },
+              { label: "Purity", value: product.karat.replace("K", ""), unit: "kt" },
+            ].map((s) => (
+              <div key={s.label} className="py-5 text-center px-4" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                <div className="text-[9px] font-medium tracking-[2px] uppercase mb-1.5" style={{ color: "rgba(255,255,255,0.35)" }}>{s.label}</div>
+                <div className="font-playfair text-xl font-bold text-[#f5e6c8]">
+                  {s.value}<span className="text-sm font-normal text-[#c9a84c] ml-0.5">{s.unit}</span>
                 </div>
               </div>
-              <div className="stat-divider"></div>
-              <div className="stat">
-                <div className="stat-label">Purity</div>
-                <div className="stat-value">
-                  {product.karat.replace("K", "")}
-                  <span className="stat-unit"> kt</span>
-                </div>
-              </div>
-            </div>
+            ))}
+          </div>
 
-            {/* Gold purity badge */}
-            <div className="purity-row">
-              <div className="purity-badge">
-                <span className="purity-icon">✦</span>
-                <span className="purity-text">Certified</span>
-                <span className="purity-val">{product.karat} Gold</span>
-                <span className="purity-text">· Hallmarked</span>
-              </div>
-            </div>
-
-            {/* Contact */}
-            <div className="contact-row">
-              <span className="contact-icon">✉</span>
-              <span className="contact-text">srialankarmandir.muz@gmail.com</span>
+          {/* Purity badge */}
+          <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+            <div className="flex items-center justify-center gap-2 rounded-xl py-3 px-5"
+              style={{ background: "linear-gradient(135deg,rgba(201,168,76,0.12),rgba(201,168,76,0.06))", border: "1px solid rgba(201,168,76,0.3)" }}
+            >
+              <span className="text-lg">✦</span>
+              <span className="text-xs text-white/50">Certified</span>
+              <span className="font-playfair text-base font-bold text-[#c9a84c]">{product.karat} Gold</span>
+              <span className="text-xs text-white/50">· Hallmarked</span>
             </div>
           </div>
-        </div>
 
-        {/* Quality seal */}
-        <div className="seal">
-          <div className="seal-inner">
-            <div className="seal-icon">🛡️</div>
-            <div className="seal-text">
-              <div className="seal-title">Quality Guaranteed</div>
-              <div className="seal-desc">Packed after rigid quality check on weight, purity & workmanship</div>
+          {/* Contact */}
+          <div className="px-5 py-3.5 flex items-center justify-center gap-2">
+            <span className="text-sm opacity-40">✉</span>
+            <span className="text-[11px] tracking-wide" style={{ color: "rgba(255,255,255,0.3)" }}>
+              srialankarmandir.muz@gmail.com
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Quality seal */}
+      <div className="w-full max-w-sm mx-auto mt-4 px-5">
+        <div className="flex items-center gap-3 rounded-2xl px-5 py-3.5"
+          style={{ background: "rgba(201,168,76,0.05)", border: "1px solid rgba(201,168,76,0.12)" }}
+        >
+          <div className="w-9 h-9 rounded-full flex items-center justify-center text-base shrink-0"
+            style={{ background: "linear-gradient(135deg,rgba(201,168,76,0.2),rgba(201,168,76,0.05))", border: "1px solid rgba(201,168,76,0.2)" }}
+          >🛡️</div>
+          <div>
+            <div className="text-[11px] font-semibold text-[#c9a84c] tracking-[0.5px]">Quality Guaranteed</div>
+            <div className="text-[10px] mt-0.5 leading-snug" style={{ color: "rgba(255,255,255,0.3)" }}>
+              Packed after rigid quality check on weight, purity &amp; workmanship
             </div>
           </div>
         </div>
       </div>
-    </>
+
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+      `}</style>
+    </div>
   );
 }

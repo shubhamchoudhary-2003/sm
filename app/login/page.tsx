@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,49 +21,72 @@ export default function LoginPage() {
       redirect: false,
     });
     setLoading(false);
-    if (res?.ok) {
-      router.push("/dashboard");
-    } else {
-      setError("Invalid username or password");
-    }
+    if (res?.ok) router.push("/dashboard");
+    else setError("Invalid username or password");
   }
 
   return (
-    <div className="min-h-screen bg-[#1a0a0a] flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-2xl p-10 w-full max-w-sm">
+    <div className="min-h-screen bg-[#0d0608] flex items-center justify-center p-5"
+      style={{ background: "radial-gradient(ellipse at 50% 0%, #2a0d14 0%, #0d0608 70%)" }}
+    >
+      <div className="w-full max-w-sm">
+        {/* Brand */}
         <div className="text-center mb-8">
-          <div className="text-4xl font-bold text-[#6b1a2a] font-serif">SM</div>
-          <div className="text-sm text-gray-500 mt-1 tracking-widest uppercase">Sri Alankar Mandir</div>
-          <div className="text-xs text-gray-400 tracking-widest uppercase">Admin Portal</div>
+          <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center font-bold text-lg font-playfair text-[#3a0a14]"
+            style={{ background: "linear-gradient(135deg,#c9a84c,#f0d080,#a07830)" }}
+          >SM</div>
+          <h1 className="text-white font-semibold text-xl tracking-wide font-playfair">Sri Alankar Mandir</h1>
+          <p className="text-[#c9a84c] text-xs tracking-[3px] uppercase mt-1">Admin Portal</p>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Username</label>
-            <input
-              name="username"
-              type="text"
-              required
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1a2a]"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Password</label>
-            <input
-              name="password"
-              type="password"
-              required
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1a2a]"
-            />
-          </div>
-          {error && <p className="text-red-500 text-xs text-center">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#6b1a2a] text-white rounded-lg py-2.5 text-sm font-semibold tracking-wide hover:bg-[#5a1522] transition disabled:opacity-60"
-          >
-            {loading ? "Signing in..." : "Sign In"}
-          </button>
-        </form>
+
+        {/* Card */}
+        <div className="bg-white rounded-2xl p-6 shadow-2xl">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label htmlFor="username" className="text-xs font-semibold uppercase tracking-wide text-gray-500 block">
+                Username
+              </label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                required
+                autoComplete="username"
+                autoCapitalize="none"
+                placeholder="admin"
+                className="w-full h-12 rounded-xl border border-gray-200 px-4 text-base focus:outline-none focus:ring-2 focus:ring-[#6b1a2a] bg-gray-50"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wide text-gray-500 block">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                className="w-full h-12 rounded-xl border border-gray-200 px-4 text-base focus:outline-none focus:ring-2 focus:ring-[#6b1a2a] bg-gray-50"
+              />
+            </div>
+
+            {error && (
+              <div className="text-red-600 text-sm text-center bg-red-50 rounded-xl py-2.5 px-3">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-12 rounded-xl bg-[#6b1a2a] text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition-transform"
+            >
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Signing in…</> : "Sign In"}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

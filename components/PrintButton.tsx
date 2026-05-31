@@ -1,12 +1,15 @@
 "use client";
 
+import { Printer } from "lucide-react";
+
 export default function PrintButton() {
   return (
     <button
       onClick={() => window.print()}
-      className="bg-[#6b1a2a] text-white px-8 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#5a1522] transition flex items-center gap-2"
+      className="w-full h-12 rounded-xl bg-[#6b1a2a] hover:bg-[#5a1522] text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
     >
-      🖨️ Print Card
+      <Printer className="w-4 h-4" />
+      Print Card
     </button>
   );
 }

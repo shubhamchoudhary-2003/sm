@@ -7,14 +7,15 @@ interface CardPreviewProps {
   qrSvg: string;
 }
 
-export default function CardPreview({
-  articleNo,
-  name,
-  weightMg,
-  karat,
-  photoUrl,
-  qrSvg,
-}: CardPreviewProps) {
+function formatWeight(mg: number): string {
+  if (mg >= 1000) {
+    const g = mg / 1000;
+    return `${g % 1 === 0 ? g.toFixed(0) : g.toFixed(3).replace(/\.?0+$/, "")}g`;
+  }
+  return `${mg % 1 === 0 ? mg : mg}mg`;
+}
+
+export default function CardPreview({ articleNo, name, weightMg, karat, photoUrl, qrSvg }: CardPreviewProps) {
   return (
     <div
       id="card-print-zone"
@@ -22,9 +23,9 @@ export default function CardPreview({
         width: "54mm",
         height: "65mm",
         backgroundColor: "#ffffff",
-        padding: "4mm",
+        padding: "3.5mm",
         boxSizing: "border-box",
-        fontFamily: "Georgia, serif",
+        fontFamily: "Georgia, 'Times New Roman', serif",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -32,43 +33,42 @@ export default function CardPreview({
       }}
     >
       {/* Top info block */}
-      <div style={{ flex: 1 }}>
-        <div style={{ marginBottom: "3mm" }}>
-          <div style={{ fontSize: "6pt", color: "#555", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5pt" }}>
+      <div style={{ flex: 1, overflow: "hidden" }}>
+        <div style={{ marginBottom: "2.5mm" }}>
+          <div style={{ fontSize: "5.5pt", color: "#666", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.6pt", fontFamily: "Arial, sans-serif" }}>
             Article No.
           </div>
-          <div style={{ fontSize: "9pt", fontWeight: "bold", color: "#1a1a1a", letterSpacing: "0.3pt" }}>
+          <div style={{ fontSize: "9pt", fontWeight: "bold", color: "#111", letterSpacing: "0.2pt", lineHeight: 1.2 }}>
             {articleNo}
           </div>
         </div>
 
-        <div style={{ marginBottom: "3mm" }}>
-          <div style={{ fontSize: "6pt", color: "#555", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5pt" }}>
+        <div style={{ marginBottom: "2.5mm" }}>
+          <div style={{ fontSize: "5.5pt", color: "#666", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.6pt", fontFamily: "Arial, sans-serif" }}>
             Name
           </div>
-          <div style={{ fontSize: "8pt", fontWeight: "bold", color: "#1a1a1a", lineHeight: "1.3" }}>
+          <div style={{ fontSize: "8pt", fontWeight: "bold", color: "#111", lineHeight: 1.25 }}>
             {name}
           </div>
         </div>
 
         <div>
-          <div style={{ fontSize: "6pt", color: "#555", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5pt" }}>
+          <div style={{ fontSize: "5.5pt", color: "#666", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.6pt", fontFamily: "Arial, sans-serif" }}>
             Weight &amp; Karat
           </div>
-          <div style={{ fontSize: "8pt", fontWeight: "bold", color: "#1a1a1a" }}>
-            {weightMg}Mg - {karat}
+          <div style={{ fontSize: "8pt", fontWeight: "bold", color: "#111" }}>
+            {formatWeight(weightMg)} – {karat}
           </div>
         </div>
       </div>
 
       {/* Bottom: photo + QR */}
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "3mm" }}>
-        {/* Product photo */}
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "2mm" }}>
         <div
           style={{
-            width: "22mm",
-            height: "22mm",
-            border: "0.3mm solid #e5e5e5",
+            width: "23mm",
+            height: "23mm",
+            border: "0.3mm solid #e0e0e0",
             borderRadius: "1mm",
             overflow: "hidden",
             backgroundColor: "#fafafa",
@@ -79,23 +79,11 @@ export default function CardPreview({
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={photoUrl}
-            alt="product"
-            style={{ width: "100%", height: "100%", objectFit: "contain", padding: "1mm" }}
-          />
+          <img src={photoUrl} alt="product" style={{ width: "100%", height: "100%", objectFit: "contain", padding: "1mm" }} />
         </div>
 
-        {/* QR code */}
         <div
-          style={{
-            width: "22mm",
-            height: "22mm",
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+          style={{ width: "23mm", height: "23mm", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
           dangerouslySetInnerHTML={{ __html: qrSvg }}
         />
       </div>

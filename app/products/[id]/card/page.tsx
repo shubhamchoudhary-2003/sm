@@ -6,12 +6,13 @@ import QRCode from "qrcode";
 import CardPreview from "@/components/CardPreview";
 import PrintButton from "@/components/PrintButton";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { buttonVariants } from "@/components/ui/button";
+import { ArrowLeft, Pencil } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export default async function CardPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function CardPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
@@ -21,60 +22,125 @@ export default async function CardPage({
 
   const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const productUrl = `${baseUrl}/product/${product.articleNo}`;
-
   const qrSvg = await QRCode.toString(productUrl, {
     type: "svg",
-    margin: 0,
+    margin: 1,
     color: { dark: "#000000", light: "#ffffff" },
-    width: 83, // ~22mm at 96dpi
+    width: 200,
   });
 
+  // 54mm × 65mm at 96dpi = 204px × 246px. We display at 2.5× = 510px × 615px
+  const SCALE = 2.5;
+  const CARD_W_PX = 204;
+  const CARD_H_PX = 246;
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-[#6b1a2a] text-white px-6 py-3 flex items-center gap-4 shadow-lg print:hidden">
-        <div className="w-8 h-8 bg-[#c9a84c] rounded-full flex items-center justify-center text-xs font-bold text-[#6b1a2a]">SM</div>
-        <Link href="/dashboard" className="text-sm text-red-200 hover:text-white">← Dashboard</Link>
-        <span className="text-sm text-white font-semibold">Print Card</span>
-      </nav>
+    <div>
+      <div className="print:hidden space-y-5 max-w-5xl mx-auto">
 
-      {/* Screen view */}
-      <div className="print:hidden p-8 flex flex-col items-center gap-6">
-        <div className="text-center">
-          <h1 className="text-xl font-bold text-gray-800 font-playfair">{product.name}</h1>
-          <p className="text-sm text-gray-500">{product.articleNo}</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <p className="text-xs text-gray-400 text-center mb-3 uppercase tracking-widest">Card Preview (White Zone — 54mm × 65mm)</p>
-          {/* Visual scale: 1mm = 3.78px at 96dpi. We show at ~3x for readability */}
-          <div style={{ transform: "scale(2.5)", transformOrigin: "top center", marginBottom: "calc(65mm * 1.5)" }}>
-            <CardPreview
-              articleNo={product.articleNo}
-              name={product.name}
-              weightMg={product.weightMg}
-              karat={product.karat}
-              photoUrl={product.photoUrl}
-              qrSvg={qrSvg}
-            />
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "gap-1.5 text-muted-foreground -ml-2")}>
+            <ArrowLeft className="w-4 h-4" /> Back
+          </Link>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold tracking-tight font-playfair truncate">{product.name}</h1>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className="text-xs text-muted-foreground font-mono">{product.articleNo}</span>
+              <Badge variant="secondary" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">{product.karat}</Badge>
+              <span className="text-xs text-muted-foreground">{product.weightMg} mg</span>
+            </div>
           </div>
-        </div>
-
-        <div className="flex gap-4">
-          <PrintButton />
-          <Link
-            href={`/products/${product.id}/edit`}
-            className="bg-gray-100 text-gray-700 px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-200 transition"
-          >
-            Edit Product
+          <Link href={`/products/${product.id}/edit`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5 shrink-0")}>
+            <Pencil className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Edit</span>
           </Link>
         </div>
 
-        <p className="text-xs text-gray-400 max-w-sm text-center">
-          Place the pre-printed card in your printer. Click Print — only the white zone content will be printed at exact 54mm × 65mm size.
-        </p>
+        {/* Two-column on desktop, stacked on mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
+
+          {/* Card preview */}
+          <div className="bg-white rounded-2xl shadow-sm p-6">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-5 text-center">
+              Card Preview — 54mm × 65mm
+            </p>
+            {/*
+              Container is exactly CARD_W_PX * SCALE wide and CARD_H_PX * SCALE tall.
+              The inner div is the natural card size; CSS scale doubles it from top-left.
+            */}
+            <div className="flex justify-center">
+              <div
+                style={{
+                  width: CARD_W_PX * SCALE,
+                  height: CARD_H_PX * SCALE,
+                  position: "relative",
+                  borderRadius: 4,
+                  overflow: "hidden",
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
+                }}
+              >
+                <div style={{ position: "absolute", top: 0, left: 0, transform: `scale(${SCALE})`, transformOrigin: "top left" }}>
+                  <CardPreview
+                    articleNo={product.articleNo}
+                    name={product.name}
+                    weightMg={product.weightMg}
+                    karat={product.karat}
+                    photoUrl={product.photoUrl}
+                    qrSvg={qrSvg}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right panel — actions + instructions */}
+          <div className="space-y-4">
+            {/* Print action */}
+            <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
+              <h2 className="text-sm font-semibold">Print this card</h2>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Place the pre-printed CR80 card in your printer with the white zone facing up, then click Print.
+              </p>
+              <PrintButton />
+            </div>
+
+            {/* Specs */}
+            <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Specs</h2>
+              <div className="space-y-2 text-sm">
+                {[
+                  ["Print zone", "54mm × 65mm"],
+                  ["Full card (CR80)", "54mm × 86mm"],
+                  ["Page margin", "0mm"],
+                  ["QR links to", `/product/${product.articleNo}`],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">{k}</span>
+                    <span className="font-medium text-right font-mono text-xs">{v}</span>
+                  </div>
+                ))}
+              </div>
+              <Separator />
+              <ol className="space-y-2 text-xs text-muted-foreground">
+                {[
+                  "Load CR80 card — white zone up.",
+                  "Click Print Card above.",
+                  "Set size 54×65mm, margins 0.",
+                  "Confirm and print.",
+                ].map((s, i) => (
+                  <li key={i} className="flex gap-2.5 items-start">
+                    <span className="w-4 h-4 rounded-full bg-[#6b1a2a] text-white text-[9px] flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                    {s}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Print-only output — exact mm dimensions */}
+      {/* Print-only output */}
       <div className="hidden print:block">
         <CardPreview
           articleNo={product.articleNo}
@@ -88,22 +154,10 @@ export default async function CardPage({
 
       <style>{`
         @media print {
-          @page {
-            size: 54mm 65mm;
-            margin: 0;
-          }
-          body * {
-            visibility: hidden;
-          }
-          #card-print-zone,
-          #card-print-zone * {
-            visibility: visible;
-          }
-          #card-print-zone {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-          }
+          @page { size: 54mm 65mm; margin: 0; }
+          body * { visibility: hidden; }
+          #card-print-zone, #card-print-zone * { visibility: visible; }
+          #card-print-zone { position: fixed !important; top: 0 !important; left: 0 !important; }
         }
       `}</style>
     </div>
