@@ -39,8 +39,10 @@ const PAPER_SIZES: Record<string, { label: string; w: number; h: number }> = {
 const DEFAULTS = {
   paperSize: "A4",
   orientation: "portrait" as "portrait" | "landscape",
-  marginMm: 20,
-  gapMm: 4,
+  marginHMm: 20,
+  marginVMm: 16,
+  gapHMm: 4,
+  gapVMm: 3,
   cardW: 54,
   cardH: 86,
   copies: 1,
@@ -285,8 +287,8 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
   const rawPaper = PAPER_SIZES[s.paperSize];
   const paper = s.orientation === "landscape" ? { w: rawPaper.h, h: rawPaper.w } : { w: rawPaper.w, h: rawPaper.h };
 
-  const cols = Math.max(1, Math.floor((paper.w - 2 * s.marginMm + s.gapMm) / (s.cardW + s.gapMm)));
-  const rows = Math.max(1, Math.floor((paper.h - 2 * s.marginMm + s.gapMm) / (s.cardH + s.gapMm)));
+  const cols = Math.max(1, Math.floor((paper.w - 2 * s.marginHMm + s.gapHMm) / (s.cardW + s.gapHMm)));
+  const rows = Math.max(1, Math.floor((paper.h - 2 * s.marginVMm + s.gapVMm) / (s.cardH + s.gapVMm)));
   const perSheet = cols * rows;
 
   const baseQueue = useMemo(() => {
@@ -324,8 +326,8 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
       const cards = Array.from({ length: rows }, (_, row) =>
         Array.from({ length: cols }, (_, col) => {
           const product = pageSlots[row * cols + col] ?? null;
-          const left = s.marginMm + col * (s.cardW + s.gapMm);
-          const top  = s.marginMm + row * (s.cardH + s.gapMm);
+          const left = s.marginHMm + col * (s.cardW + s.gapHMm);
+          const top  = s.marginVMm + row * (s.cardH + s.gapVMm);
           if (!product) return "";
           return `<div style="position:absolute;left:${left}mm;top:${top}mm">${cardHtml(product, s)}</div>`;
         }).join("")
@@ -498,8 +500,12 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
                 <div className="space-y-2">
                   <SectionLabel>Spacing</SectionLabel>
                   <div className="grid grid-cols-2 gap-2">
-                    <MmInput label="Margin" value={s.marginMm} onChange={(v) => update("marginMm", v)} min={0} max={30} />
-                    <MmInput label="Gap" value={s.gapMm} onChange={(v) => update("gapMm", v)} min={0} max={20} />
+                    <MmInput label="Margin L/R" value={s.marginHMm} onChange={(v) => update("marginHMm", v)} min={0} max={50} />
+                    <MmInput label="Margin T/B" value={s.marginVMm} onChange={(v) => update("marginVMm", v)} min={0} max={50} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <MmInput label="Gap H" value={s.gapHMm} onChange={(v) => update("gapHMm", v)} min={0} max={20} />
+                    <MmInput label="Gap V" value={s.gapVMm} onChange={(v) => update("gapVMm", v)} min={0} max={20} />
                   </div>
                 </div>
 
@@ -662,13 +668,13 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
               <div>
                 <div style={{ width: previewW, height: previewH, background: "#f0ece8", border: "1px solid #e5e7eb", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", position: "relative", overflow: "hidden" }}>
                   {/* Margin guide */}
-                  <div style={{ position: "absolute", top: s.marginMm * scale, left: s.marginMm * scale, right: s.marginMm * scale, bottom: s.marginMm * scale, border: "1px dashed #ccc", pointerEvents: "none" }} />
+                  <div style={{ position: "absolute", top: s.marginVMm * scale, left: s.marginHMm * scale, right: s.marginHMm * scale, bottom: s.marginVMm * scale, border: "1px dashed #ccc", pointerEvents: "none" }} />
 
                   {Array.from({ length: rows }, (_, row) =>
                     Array.from({ length: cols }, (_, col) => {
                       const product = firstPageSlots[row * cols + col] ?? null;
-                      const x = (s.marginMm + col * (s.cardW + s.gapMm)) * scale;
-                      const y = (s.marginMm + row * (s.cardH + s.gapMm)) * scale;
+                      const x = (s.marginHMm + col * (s.cardW + s.gapHMm)) * scale;
+                      const y = (s.marginVMm + row * (s.cardH + s.gapVMm)) * scale;
                       const w = s.cardW * scale;
                       const h = s.cardH * scale;
                       const cellScale = w / (s.cardW * 3.7795);
