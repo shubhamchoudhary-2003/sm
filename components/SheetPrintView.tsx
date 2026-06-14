@@ -39,9 +39,9 @@ const PAPER_SIZES: Record<string, { label: string; w: number; h: number }> = {
 const DEFAULTS = {
   paperSize: "A4",
   orientation: "portrait" as "portrait" | "landscape",
-  marginMm: 18,
-  gapMm: 3,
-  cardW: 56,
+  marginMm: 20,
+  gapMm: 4,
+  cardW: 54,
   cardH: 86,
   copies: 1,
   showCutGuide: true,
