@@ -39,7 +39,7 @@ const PAPER_SIZES: Record<string, { label: string; w: number; h: number }> = {
 const DEFAULTS = {
   paperSize: "A4",
   orientation: "portrait" as "portrait" | "landscape",
-  marginHMm: 20,
+  marginHMm: 17,
   marginVMm: 16,
   gapHMm: 4,
   gapVMm: 3,
@@ -86,9 +86,9 @@ function cardHtml(p: Product, s: Settings): string {
   const photoSize = rightColW * (s.photoSizePct / 100);
 
   const infoRows = [
-    s.showArticleNo   ? `<div style="margin-bottom:2mm"><div style="font-size:4pt;color:#888;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Article No.</div><div style="font-size:8pt;font-weight:bold;color:#111;line-height:1.2;font-family:${font}">${p.articleNo}</div></div>` : "",
-    s.showName        ? `<div style="margin-bottom:2mm"><div style="font-size:4pt;color:#888;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Name</div><div style="font-size:7.5pt;font-weight:bold;color:#111;line-height:1.25;font-family:${font}">${p.name}</div></div>` : "",
-    s.showWeightKarat ? `<div><div style="font-size:4pt;color:#888;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Weight &amp; Karat</div><div style="font-size:7.5pt;font-weight:bold;color:#111;font-family:${font}">${formatWeight(p.weightMg)} &#8211; ${p.karat}</div></div>` : "",
+    s.showArticleNo   ? `<div style="margin-bottom:1.5mm"><div style="font-size:4pt;color:#999;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Article No.</div><div style="font-size:8.5pt;font-weight:900;color:#000;line-height:1.2;font-family:${font}">${p.articleNo}</div></div>` : "",
+    s.showName        ? `<div style="margin-bottom:1.5mm"><div style="font-size:4pt;color:#999;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Name</div><div style="font-size:8pt;font-weight:900;color:#000;line-height:1.25;font-family:${font}">${p.name}</div></div>` : "",
+    s.showWeightKarat ? `<div><div style="font-size:4pt;color:#999;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Weight &amp; Karat</div><div style="font-size:8pt;font-weight:900;color:#000;font-family:${font}">${formatWeight(p.weightMg)} &#8211; ${p.karat}</div></div>` : "",
   ].join("");
 
   // Strip width/height attrs from the SVG so it fills our container
@@ -111,7 +111,7 @@ function cardHtml(p: Product, s: Settings): string {
   return `
     <div style="width:${s.cardW}mm;height:${s.cardH}mm;box-sizing:border-box;overflow:hidden;${cutOutline}display:flex;flex-direction:column;">
       <div style="height:${s.topReservedMm}mm;flex-shrink:0"></div>
-      <div style="flex:1;min-height:0;background:#fff;padding:2.5mm 2.5mm;box-sizing:border-box;display:flex;flex-direction:row;gap:1.5mm;overflow:hidden;">
+      <div style="flex:1;min-height:0;background:#fff;padding:2mm 1.5mm 2mm 3mm;box-sizing:border-box;display:flex;flex-direction:row;gap:1mm;overflow:hidden;">
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;">
           <div>${infoRows}</div>
           ${photoCol}
@@ -162,16 +162,16 @@ function CardCell({ p, s, isPreview = false, scale = 1 }: { p: Product; s: Setti
       {/* White zone: left info col + right QR/photo col */}
       <div style={{
         flex: 1, minHeight: 0, backgroundColor: "#fff",
-        padding: "2.5mm 2.5mm", boxSizing: "border-box",
-        display: "flex", flexDirection: "row", gap: "1.5mm", overflow: "hidden",
+        padding: "2mm 1.5mm 2mm 0.5mm", boxSizing: "border-box",
+        display: "flex", flexDirection: "row", gap: "1mm", overflow: "hidden",
       }}>
         {/* Left: text info top, photo bottom-left */}
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", overflow: "hidden" }}>
           <div>
             {infoRows.map(({ lbl, val, sz }, i) => (
               <div key={i} style={{ marginBottom: i < infoRows.length - 1 ? "2mm" : 0 }}>
-                <div style={{ fontSize: "4pt", color: "#888", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.4pt", fontFamily: "Arial,sans-serif" }}>{lbl}</div>
-                <div style={{ fontSize: sz, fontWeight: "bold", color: "#111", lineHeight: 1.25, fontFamily: font }}>{val}</div>
+                <div style={{ fontSize: "4pt", color: "#999", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.4pt", fontFamily: "Arial,sans-serif" }}>{lbl}</div>
+                <div style={{ fontSize: sz, fontWeight: 900, color: "#000", lineHeight: 1.25, fontFamily: font }}>{val}</div>
               </div>
             ))}
           </div>
