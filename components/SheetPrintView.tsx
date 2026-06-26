@@ -101,7 +101,7 @@ function cardHtml(p: Product, s: Settings): string {
     : "";
 
   const photoCol = s.showPhoto
-    ? `<div style="width:${photoSize}mm;height:${photoSize}mm;margin:0 auto;overflow:hidden;background:transparent;display:flex;align-items:center;justify-content:center"><img src="${p.photoUrl}" style="width:100%;height:100%;object-fit:contain;filter:brightness(1.12) contrast(0.92)" /></div>`
+    ? `<div style="width:${photoSize}mm;height:${photoSize}mm;margin:0;overflow:hidden;background:transparent;display:flex;align-items:center;justify-content:flex-start"><img src="${p.photoUrl}" style="width:100%;height:100%;object-fit:contain;filter:brightness(1.12) contrast(0.92)" /></div>`
     : "";
 
   const scanLabel = s.showQr ? `<div style="font-size:4.5pt;font-weight:bold;color:#333;text-align:center;margin-bottom:0.5mm;font-family:Arial,sans-serif">Scan Here</div>` : "";
@@ -176,7 +176,7 @@ function CardCell({ p, s, isPreview = false, scale = 1 }: { p: Product; s: Setti
             ))}
           </div>
           {s.showPhoto && (
-            <div style={{ width: `${photoSize}mm`, height: `${photoSize}mm`, overflow: "hidden", backgroundColor: "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div style={{ width: `${photoSize}mm`, height: `${photoSize}mm`, overflow: "hidden", backgroundColor: "transparent", display: "flex", alignItems: "center", justifyContent: "flex-start", flexShrink: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", filter: "brightness(1.12) contrast(0.92)" }} />
             </div>
