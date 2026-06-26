@@ -86,9 +86,9 @@ function cardHtml(p: Product, s: Settings): string {
   const photoSize = rightColW * (s.photoSizePct / 100);
 
   const infoRows = [
-    s.showArticleNo   ? `<div style="margin-bottom:1.5mm"><div style="font-size:4pt;color:#999;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Article No.</div><div style="font-size:8.5pt;font-weight:900;color:#000;line-height:1.2;font-family:${font}">${p.articleNo}</div></div>` : "",
-    s.showName        ? `<div style="margin-bottom:1.5mm"><div style="font-size:4pt;color:#999;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Name</div><div style="font-size:8pt;font-weight:900;color:#000;line-height:1.25;font-family:${font}">${p.name}</div></div>` : "",
-    s.showWeightKarat ? `<div><div style="font-size:4pt;color:#999;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Weight &amp; Karat</div><div style="font-size:8pt;font-weight:900;color:#000;font-family:${font}">${formatWeight(p.weightMg)} &#8211; ${p.karat}</div></div>` : "",
+    s.showArticleNo   ? `<div style="margin-bottom:1.5mm"><div style="font-size:4pt;color:#999;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Article No.</div><div style="font-size:9.5pt;font-weight:700;color:#000;line-height:1.2;font-family:${font}">${p.articleNo}</div></div>` : "",
+    s.showName        ? `<div style="margin-bottom:1.5mm"><div style="font-size:4pt;color:#999;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Name</div><div style="font-size:9pt;font-weight:700;color:#000;line-height:1.25;font-family:${font}">${p.name}</div></div>` : "",
+    s.showWeightKarat ? `<div><div style="font-size:4pt;color:#999;font-weight:bold;text-transform:uppercase;letter-spacing:0.4pt;font-family:Arial,sans-serif">Weight &amp; Karat</div><div style="font-size:9pt;font-weight:700;color:#000;font-family:${font}">${formatWeight(p.weightMg)} &#8211; ${p.karat}</div></div>` : "",
   ].join("");
 
   // Strip width/height attrs from the SVG so it fills our container
@@ -106,7 +106,7 @@ function cardHtml(p: Product, s: Settings): string {
 
   const scanLabel = s.showQr ? `<div style="font-size:4.5pt;font-weight:bold;color:#333;text-align:center;margin-bottom:0.5mm;font-family:Arial,sans-serif">Scan Here</div>` : "";
 
-  const cutOutline = s.showCutGuide ? "outline:0.2mm dashed #aaa;" : "";
+  const cutOutline = s.showCutGuide ? "border:0.2mm dashed #bbb;" : "border:none;";
 
   return `
     <div style="width:${s.cardW}mm;height:${s.cardH}mm;box-sizing:border-box;overflow:hidden;${cutOutline}display:flex;flex-direction:column;">
@@ -137,16 +137,16 @@ function CardCell({ p, s, isPreview = false, scale = 1 }: { p: Product; s: Setti
   const photoSize = rightColW * (s.photoSizePct / 100);
 
   const infoRows = [
-    s.showArticleNo   && { lbl: "Article No.",     val: p.articleNo,                              sz: "8pt" },
-    s.showName        && { lbl: "Name",             val: p.name,                                   sz: "7.5pt" },
-    s.showWeightKarat && { lbl: "Weight & Karat",   val: `${formatWeight(p.weightMg)} – ${p.karat}`, sz: "7.5pt" },
+    s.showArticleNo   && { lbl: "Article No.",     val: p.articleNo,                              sz: "9.5pt" },
+    s.showName        && { lbl: "Name",             val: p.name,                                   sz: "9pt" },
+    s.showWeightKarat && { lbl: "Weight & Karat",   val: `${formatWeight(p.weightMg)} – ${p.karat}`, sz: "9pt" },
   ].filter(Boolean) as { lbl: string; val: string; sz: string }[];
 
   return (
     <div style={{
       width: `${s.cardW}mm`, height: `${s.cardH}mm`,
       boxSizing: "border-box", overflow: "hidden",
-      outline: s.showCutGuide ? "0.2mm dashed #aaa" : "none",
+      border: s.showCutGuide ? "0.2mm dashed #bbb" : "none",
       display: "flex", flexDirection: "column",
     }}>
       {/* Top reserved band */}
@@ -171,7 +171,7 @@ function CardCell({ p, s, isPreview = false, scale = 1 }: { p: Product; s: Setti
             {infoRows.map(({ lbl, val, sz }, i) => (
               <div key={i} style={{ marginBottom: i < infoRows.length - 1 ? "2mm" : 0 }}>
                 <div style={{ fontSize: "4pt", color: "#999", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.4pt", fontFamily: "Arial,sans-serif" }}>{lbl}</div>
-                <div style={{ fontSize: sz, fontWeight: 900, color: "#000", lineHeight: 1.25, fontFamily: font }}>{val}</div>
+                <div style={{ fontSize: sz, fontWeight: 700, color: "#000", lineHeight: 1.25, fontFamily: font }}>{val}</div>
               </div>
             ))}
           </div>
@@ -279,6 +279,7 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [searchQ, setSearchQ] = useState("");
+  const [showPrintTip, setShowPrintTip] = useState(false);
 
   function update<K extends keyof Settings>(key: K, val: Settings[K]) {
     setS((prev) => ({ ...prev, [key]: val }));
@@ -317,7 +318,13 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
   const pages = Math.max(1, Math.ceil(slots.length / perSheet));
 
   // ── Print via iframe ────────────────────────────────────────────────────────
+  function triggerPrint() {
+    if (!baseQueue.length) return;
+    setShowPrintTip(true);
+  }
+
   const handlePrint = useCallback(() => {
+    setShowPrintTip(false);
     if (!baseQueue.length) return;
 
     // Build all pages as raw HTML
@@ -342,7 +349,7 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
         *{box-sizing:border-box;margin:0;padding:0}
         @page{size:${paper.w}mm ${paper.h}mm;margin:0}
         html,body{width:${paper.w}mm;margin:0;padding:0;background:#fff}
-        img{display:block}
+        img{display:block;image-rendering:high-quality}
         svg{display:block!important;width:100%!important;height:100%!important}
       </style>
     </head><body>${pagesHtml}</body></html>`;
@@ -395,6 +402,54 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
   return (
     <div className="space-y-5 max-w-6xl mx-auto">
 
+      {/* Print quality reminder modal */}
+      {showPrintTip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#6b1a2a]/10 flex items-center justify-center shrink-0">
+                <Printer className="w-5 h-5 text-[#6b1a2a]" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Set printer to high quality</h2>
+                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                  In the print dialog, make sure to:
+                </p>
+              </div>
+            </div>
+
+            <ol className="space-y-2.5 text-sm">
+              {[
+                { n: 1, t: "Print Quality", d: 'Set to "Best" or "High" in your printer dialog' },
+                { n: 2, t: "Media Type", d: 'Choose "Photo Paper" or "Glossy" if available' },
+                { n: 3, t: "Page Sizing", d: 'Set to "Actual Size" — never "Fit to Page"' },
+                { n: 4, t: "Colour", d: 'Keep "Colour" selected, not Grayscale' },
+              ].map(({ n, t, d }) => (
+                <li key={n} className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-[#6b1a2a] text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{n}</span>
+                  <span><span className="font-semibold text-gray-800">{t}:</span> <span className="text-muted-foreground">{d}</span></span>
+                </li>
+              ))}
+            </ol>
+
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setShowPrintTip(false)}
+                className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePrint}
+                className="flex-1 py-2.5 rounded-lg bg-[#6b1a2a] text-white text-sm font-semibold hover:bg-[#5a1522] transition-colors flex items-center justify-center gap-2"
+              >
+                <Printer className="w-4 h-4" /> Print now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -409,7 +464,7 @@ export default function SheetPrintView({ products }: { products: Product[] }) {
               <RotateCcw className="w-3 h-3" /> Reset
             </button>
           )}
-          <button onClick={handlePrint} disabled={baseQueue.length === 0}
+          <button onClick={triggerPrint} disabled={baseQueue.length === 0}
             className="flex items-center gap-2 px-5 h-10 rounded-md bg-[#6b1a2a] text-white text-sm font-semibold hover:bg-[#5a1522] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             <Printer className="w-4 h-4" />
             Print{pages > 0 && baseQueue.length > 0 ? ` · ${pages} page${pages > 1 ? "s" : ""}` : ""}
