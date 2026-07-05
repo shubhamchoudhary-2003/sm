@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ImagePlus, Loader2, CheckCircle2, Upload } from "lucide-react";
+import { ImagePlus, Loader2, CheckCircle2, Upload, Crop } from "lucide-react";
 import { cn } from "@/lib/utils";
+import EasyCrop from "react-easy-crop";
+import type { Area } from "react-easy-crop";
 
 interface Product {
   id?: string;
@@ -26,6 +28,21 @@ interface Product {
 }
 
 const KARATS = ["14K", "18K", "22K", "24K", "26K", "28K"];
+
+async function getCroppedBlob(imageSrc: string, cropPx: Area, mimeType: string): Promise<Blob> {
+  const image = await new Promise<HTMLImageElement>((res, rej) => {
+    const img = new window.Image();
+    img.onload = () => res(img);
+    img.onerror = rej;
+    img.src = imageSrc;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = cropPx.width;
+  canvas.height = cropPx.height;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(image, cropPx.x, cropPx.y, cropPx.width, cropPx.height, 0, 0, cropPx.width, cropPx.height);
+  return new Promise((res, rej) => canvas.toBlob((b) => b ? res(b) : rej(new Error("canvas toBlob failed")), mimeType, 0.95));
+}
 
 export default function ProductForm({ product, suggestedArticleNo }: { product?: Product; suggestedArticleNo?: string }) {
   const router = useRouter();
@@ -45,11 +62,24 @@ export default function ProductForm({ product, suggestedArticleNo }: { product?:
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [photoWarn, setPhotoWarn] = useState("");
+
+  // Crop modal state
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [cropMime, setCropMime] = useState("image/jpeg");
+  const [cropExt, setCropExt] = useState("jpg");
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPx, setCroppedAreaPx] = useState<Area | null>(null);
+
+  const onCropComplete = useCallback((_: Area, areaPx: Area) => {
+    setCroppedAreaPx(areaPx);
+  }, []);
 
   function switchUnit(newUnit: "mg" | "g") {
     const v = parseFloat(form.weightDisplay);
     if (!isNaN(v) && form.weightDisplay !== "") {
-      let converted = weightUnit === "mg" && newUnit === "g" ? v / 1000 : v * 1000;
+      const converted = weightUnit === "mg" && newUnit === "g" ? v / 1000 : v * 1000;
       const str = converted % 1 === 0 ? String(converted) : parseFloat(converted.toFixed(4)).toString();
       setForm((f) => ({ ...f, weightDisplay: str }));
     }
@@ -62,22 +92,50 @@ export default function ProductForm({ product, suggestedArticleNo }: { product?:
     return weightUnit === "g" ? Math.round(v * 1000) : Math.round(v);
   }
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploading(true);
+    // Reset file input so same file can be re-selected after cancel
+    e.target.value = "";
+    const objectUrl = URL.createObjectURL(file);
+    setCropSrc(objectUrl);
+    setCropMime(file.type || "image/jpeg");
+    setCropExt(file.name.split(".").pop() ?? "jpg");
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+  }
+
+  function cancelCrop() {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
+  }
+
+  async function confirmCrop() {
+    if (!cropSrc || !croppedAreaPx) return;
     setError("");
+    setPhotoWarn("");
+
+    // Check quality on cropped dimensions
+    if (croppedAreaPx.width < 600 || croppedAreaPx.height < 600) {
+      setPhotoWarn(`Low resolution (${croppedAreaPx.width}×${croppedAreaPx.height}px crop) — photo may look blurry on print. Try zooming out or use a higher-res image (min 600×600px).`);
+    }
+
+    setCropSrc(null);
+    setUploading(true);
     try {
-      const ext = file.name.split(".").pop() ?? "jpg";
+      const blob = await getCroppedBlob(cropSrc, croppedAreaPx, cropMime);
+      const previewUrl = URL.createObjectURL(blob);
+      setPreview(previewUrl);
+
       const res = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentType: file.type, extension: ext }),
+        body: JSON.stringify({ contentType: cropMime, extension: cropExt }),
       });
       const { uploadUrl, publicUrl } = await res.json();
-      await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      await fetch(uploadUrl, { method: "PUT", body: blob, headers: { "Content-Type": cropMime } });
       setForm((f) => ({ ...f, photoUrl: publicUrl }));
-      setPreview(URL.createObjectURL(file));
+      URL.revokeObjectURL(cropSrc);
     } catch {
       setError("Photo upload failed. Check your connection.");
     } finally {
@@ -117,164 +175,221 @@ export default function ProductForm({ product, suggestedArticleNo }: { product?:
   })();
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-
-      {/* Photo */}
-      <div className="space-y-2">
-        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Product Photo</Label>
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          className="w-full border border-dashed border-border rounded-lg bg-muted/30 hover:bg-muted/50 hover:border-[#6b1a2a]/50 transition-colors overflow-hidden"
-        >
-          {preview ? (
-            <div className="relative">
-              <img src={preview} alt="preview" className="w-full h-56 object-contain p-6" />
-              <div className="absolute top-3 right-3 bg-green-500 text-white rounded-full p-1 shadow">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-              </div>
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full">
-                Tap to change
-              </div>
-            </div>
-          ) : (
-            <div className="py-12 flex flex-col items-center gap-3 text-muted-foreground">
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                <ImagePlus className="w-5 h-5" />
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-medium text-foreground">Upload product photo</p>
-                <p className="text-xs text-muted-foreground mt-0.5">PNG, JPG, WebP — click to browse</p>
-              </div>
-            </div>
-          )}
-          {uploading && (
-            <div className="border-t border-border py-2.5 flex items-center justify-center gap-2 text-[#6b1a2a] text-xs font-medium bg-[#6b1a2a]/5">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading photo…
-            </div>
-          )}
-        </button>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-      </div>
-
-      <Separator />
-
-      {/* Article No */}
-      <div className="space-y-2">
-        <Label htmlFor="articleNo" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Article Number
-        </Label>
-        <Input
-          id="articleNo"
-          required
-          value={form.articleNo}
-          onChange={(e) => setForm((f) => ({ ...f, articleNo: e.target.value }))}
-          placeholder="e.g. NK1824375"
-          className="h-10"
-        />
-      </div>
-
-      {/* Name */}
-      <div className="space-y-2">
-        <Label htmlFor="name" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Product Name
-        </Label>
-        <Input
-          id="name"
-          required
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          placeholder="e.g. Bombay Fancy Nose Pin"
-          className="h-10"
-        />
-      </div>
-
-      {/* Weight + Karat */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="weight" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Weight
-            </Label>
-            {/* Unit toggle */}
-            <div className="flex items-center border border-border rounded-md overflow-hidden text-xs">
-              {(["mg", "g"] as const).map((u) => (
-                <button
-                  key={u}
-                  type="button"
-                  onClick={() => switchUnit(u)}
-                  className={cn(
-                    "px-2.5 py-0.5 font-medium transition-colors",
-                    weightUnit === u ? "bg-[#6b1a2a] text-white" : "text-muted-foreground hover:bg-muted"
-                  )}
-                >
-                  {u}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="relative">
-            <Input
-              id="weight"
-              required
-              type="number"
-              min="0.001"
-              step="any"
-              inputMode="decimal"
-              value={form.weightDisplay}
-              onChange={(e) => setForm((f) => ({ ...f, weightDisplay: e.target.value }))}
-              placeholder={weightUnit === "mg" ? "e.g. 327" : "e.g. 0.327"}
-              className="h-10 pr-9"
+    <>
+      {/* Crop Modal */}
+      {cropSrc && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black">
+          {/* Cropper area */}
+          <div className="relative flex-1">
+            <EasyCrop
+              image={cropSrc}
+              crop={crop}
+              zoom={zoom}
+              aspect={1}
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={onCropComplete}
+              objectFit="contain"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-              {weightUnit}
-            </span>
           </div>
-          {conversionHint && (
-            <p className="text-xs text-muted-foreground">= {conversionHint}</p>
-          )}
-        </div>
 
-        <div className="space-y-2">
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Karat</Label>
-          <Select value={form.karat} onValueChange={(v) => setForm((f) => ({ ...f, karat: v ?? f.karat }))}>
-            <SelectTrigger className="h-10">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {KARATS.map((k) => (
-                <SelectItem key={k} value={k}>{k}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+          {/* Zoom slider */}
+          <div className="bg-black px-6 py-3 flex items-center gap-3">
+            <span className="text-white/60 text-xs">Zoom</span>
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.01}
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+              className="flex-1 accent-[#6b1a2a]"
+            />
+          </div>
 
-      {error && (
-        <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
-          {error}
-        </p>
+          {/* Actions */}
+          <div className="bg-black px-4 pb-6 pt-2 flex gap-3">
+            <button
+              type="button"
+              onClick={cancelCrop}
+              className="flex-1 py-3 rounded-lg border border-white/20 text-white text-sm font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmCrop}
+              className="flex-1 py-3 rounded-lg bg-[#6b1a2a] text-white text-sm font-medium flex items-center justify-center gap-2"
+            >
+              <Crop className="w-4 h-4" /> Use this crop
+            </button>
+          </div>
+        </div>
       )}
 
-      <Separator />
+      <form onSubmit={handleSubmit} className="space-y-6">
 
-      {/* Actions */}
-      <div className="flex gap-3">
-        <Button
-          type="submit"
-          disabled={saving || uploading}
-          className="flex-1 bg-[#6b1a2a] hover:bg-[#5a1522] text-white"
-        >
-          {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving…</> : <><Upload className="w-4 h-4 mr-2" />{isEdit ? "Save Changes" : "Add Product"}</>}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.back()}
-        >
-          Cancel
-        </Button>
-      </div>
-    </form>
+        {/* Photo */}
+        <div className="space-y-2">
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Product Photo</Label>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="w-full border border-dashed border-border rounded-lg bg-muted/30 hover:bg-muted/50 hover:border-[#6b1a2a]/50 transition-colors overflow-hidden"
+          >
+            {preview ? (
+              <div className="relative">
+                <img src={preview} alt="preview" className="w-full h-56 object-contain p-6" />
+                <div className="absolute top-3 right-3 bg-green-500 text-white rounded-full p-1 shadow">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </div>
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full">
+                  Tap to change
+                </div>
+              </div>
+            ) : (
+              <div className="py-12 flex flex-col items-center gap-3 text-muted-foreground">
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                  <ImagePlus className="w-5 h-5" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium text-foreground">Upload product photo</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">PNG, JPG, WebP · min 600×600px · you can crop after selecting</p>
+                </div>
+              </div>
+            )}
+            {uploading && (
+              <div className="border-t border-border py-2.5 flex items-center justify-center gap-2 text-[#6b1a2a] text-xs font-medium bg-[#6b1a2a]/5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading photo…
+              </div>
+            )}
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+          {photoWarn && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              ⚠ {photoWarn}
+            </p>
+          )}
+        </div>
+
+        <Separator />
+
+        {/* Article No */}
+        <div className="space-y-2">
+          <Label htmlFor="articleNo" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Article Number
+          </Label>
+          <Input
+            id="articleNo"
+            required
+            value={form.articleNo}
+            onChange={(e) => setForm((f) => ({ ...f, articleNo: e.target.value }))}
+            placeholder="e.g. NK1824375"
+            className="h-10"
+          />
+        </div>
+
+        {/* Name */}
+        <div className="space-y-2">
+          <Label htmlFor="name" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Product Name
+          </Label>
+          <Input
+            id="name"
+            required
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            placeholder="e.g. Bombay Fancy Nose Pin"
+            className="h-10"
+          />
+        </div>
+
+        {/* Weight + Karat */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="weight" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Weight
+              </Label>
+              <div className="flex items-center border border-border rounded-md overflow-hidden text-xs">
+                {(["mg", "g"] as const).map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => switchUnit(u)}
+                    className={cn(
+                      "px-2.5 py-0.5 font-medium transition-colors",
+                      weightUnit === u ? "bg-[#6b1a2a] text-white" : "text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {u}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="relative">
+              <Input
+                id="weight"
+                required
+                type="number"
+                min="0.001"
+                step="any"
+                inputMode="decimal"
+                value={form.weightDisplay}
+                onChange={(e) => setForm((f) => ({ ...f, weightDisplay: e.target.value }))}
+                placeholder={weightUnit === "mg" ? "e.g. 327" : "e.g. 0.327"}
+                className="h-10 pr-9"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                {weightUnit}
+              </span>
+            </div>
+            {conversionHint && (
+              <p className="text-xs text-muted-foreground">= {conversionHint}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Karat</Label>
+            <Select value={form.karat} onValueChange={(v) => setForm((f) => ({ ...f, karat: v ?? f.karat }))}>
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {KARATS.map((k) => (
+                  <SelectItem key={k} value={k}>{k}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {error && (
+          <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+            {error}
+          </p>
+        )}
+
+        <Separator />
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          <Button
+            type="submit"
+            disabled={saving || uploading}
+            className="flex-1 bg-[#6b1a2a] hover:bg-[#5a1522] text-white"
+          >
+            {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving…</> : <><Upload className="w-4 h-4 mr-2" />{isEdit ? "Save Changes" : "Add Product"}</>}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </>
   );
 }

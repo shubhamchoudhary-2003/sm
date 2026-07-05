@@ -35,28 +35,28 @@ export default function CardPreview({ articleNo, name, weightMg, karat, photoUrl
       {/* Top info block */}
       <div style={{ flex: 1, overflow: "hidden" }}>
         <div style={{ marginBottom: "2.5mm" }}>
-          <div style={{ fontSize: "5.5pt", color: "#666", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.6pt", fontFamily: "Arial, sans-serif" }}>
+          <div style={{ fontSize: "5pt", color: "#888", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5pt", fontFamily: "Arial, sans-serif" }}>
             Article No.
           </div>
-          <div style={{ fontSize: "9pt", fontWeight: "bold", color: "#111", letterSpacing: "0.2pt", lineHeight: 1.2 }}>
+          <div style={{ fontSize: "10pt", fontWeight: "600", color: "#111", letterSpacing: "0.2pt", lineHeight: 1.2 }}>
             {articleNo}
           </div>
         </div>
 
         <div style={{ marginBottom: "2.5mm" }}>
-          <div style={{ fontSize: "5.5pt", color: "#666", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.6pt", fontFamily: "Arial, sans-serif" }}>
+          <div style={{ fontSize: "5pt", color: "#888", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5pt", fontFamily: "Arial, sans-serif" }}>
             Name
           </div>
-          <div style={{ fontSize: "8pt", fontWeight: "bold", color: "#111", lineHeight: 1.25 }}>
+          <div style={{ fontSize: "9pt", fontWeight: "600", color: "#111", lineHeight: 1.25 }}>
             {name}
           </div>
         </div>
 
         <div>
-          <div style={{ fontSize: "5.5pt", color: "#666", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.6pt", fontFamily: "Arial, sans-serif" }}>
+          <div style={{ fontSize: "5pt", color: "#888", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5pt", fontFamily: "Arial, sans-serif" }}>
             Weight &amp; Karat
           </div>
-          <div style={{ fontSize: "8pt", fontWeight: "bold", color: "#111" }}>
+          <div style={{ fontSize: "9pt", fontWeight: "600", color: "#111" }}>
             {formatWeight(weightMg)} – {karat}
           </div>
         </div>
@@ -79,7 +79,7 @@ export default function CardPreview({ articleNo, name, weightMg, karat, photoUrl
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photoUrl} alt="product" style={{ width: "100%", height: "100%", objectFit: "contain", padding: "1mm" }} />
+          <img src={photoUrl} alt="product" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         </div>
 
         <div
